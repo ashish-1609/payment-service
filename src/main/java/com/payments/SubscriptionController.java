@@ -37,6 +37,8 @@ import com.gateway.subscription.PlanDTO;
 import com.gateway.subscription.RetryDTO;
 import com.gateway.subscription.ScheduleUpdateDTO;
 import com.gateway.subscription.SubscriptionFactory;
+import com.payments.commons.TestConstants;
+import com.payments.services.FormBuilderService;
 
 public class SubscriptionController {
 
@@ -145,7 +147,7 @@ public class SubscriptionController {
 				.setStaging(true).setTransactionDetails(transactionDetails).setUrlDetails(urlDetails)
 				.setCardDetails(cardDetails).buildPayment();
 		System.out.println(stringObjectMap);
-		FormBuilder formBuilder = new FormBuilder();
+		FormBuilderService formBuilder = new FormBuilderService();
 		formBuilder.createForm(stringObjectMap);
 	}
 
@@ -190,7 +192,7 @@ public class SubscriptionController {
 				// ChallengeWindowEnum.<CHALLENGE_WINDOW>)
 				.buildPayment();
 		System.out.println(finalResponse);
-		FormBuilder formBuilder = new FormBuilder();
+		FormBuilderService formBuilder = new FormBuilderService();
 		formBuilder.createForm(finalResponse);
 
 	}
@@ -212,7 +214,7 @@ public class SubscriptionController {
 				.setStaging(true).setUrlDetails(urlDetails).setBillingDetails(addressDetails)
 				.setTransactionDetails(transactionDetails).setTokenDetails(tokenDetails).buildPayment();
 		System.out.println(response);
-		FormBuilder formBuilder = new FormBuilder();
+		FormBuilderService formBuilder = new FormBuilderService();
 		formBuilder.createForm(response);
 	}
 
@@ -234,7 +236,7 @@ public class SubscriptionController {
 				.setStaging(true).setUrlDetails(urlDetails).setBillingDetails(addressDetails)
 				.setTransactionDetails(transactionDetails).setTokenDetails(tokenDetails).buildPayment();
 		System.out.println(response);
-		FormBuilder formBuilder = new FormBuilder();
+		FormBuilderService formBuilder = new FormBuilderService();
 		formBuilder.createForm(response);
 	}
 
@@ -252,7 +254,7 @@ public class SubscriptionController {
 		Map<String, Object> payment = PaymentFactory.getInstance(CERTIFICATE, MERCHANT_DETAILS, ACCESS_TOKEN)
 				.setStaging(true).setBillingDetails(billingDetails).setUrlDetails(urlDetails)
 				.setTransactionDetails(transactionDetails).buildPayment();
-		FormBuilder formBuilder = new FormBuilder();
+		FormBuilderService formBuilder = new FormBuilderService();
 		formBuilder.createForm(payment);
 		System.out.println(payment);
 	}

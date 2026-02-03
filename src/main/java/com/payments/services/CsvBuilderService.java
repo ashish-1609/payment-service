@@ -1,11 +1,7 @@
-package com.payments;
+package com.payments.services;
 
-import org.json.JSONObject;
-
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,15 +10,22 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import com.payments.commons.TestConstants;
+import org.json.JSONObject;
+import org.springframework.stereotype.Service;
+
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
+@Service
 public class CsvBuilderService {
 
-	public static void prepareReconciliationFile(List<String> items, String acquirer, String amount, String ref,
-			LocalDateTime date) {
-		updateFileData(items, acquirer, amount, ref, date);
+	public void prepareReconciliationFile(List<String> items, String acquirer, String amount, String ref) {
+		updateFileData(items, acquirer, amount, ref);
 	}
 
-	private static void updateFileData(List<String> items, String acquirer, String amount, String ref,
-			LocalDateTime date) {
+	private void updateFileData(List<String> items, String acquirer, String amount, String ref) {
+		LocalDateTime date = LocalDateTime.now();
 		switch (acquirer) {
 			case "acquired" :
 				// "/home/ashish/TestFiles/acquired.json";
@@ -41,7 +44,7 @@ public class CsvBuilderService {
 		}
 	}
 
-	private static void updateEcommpayReconciliationData(List<String> items, String amount, String ref,
+	private void updateEcommpayReconciliationData(List<String> items, String amount, String ref,
 			LocalDateTime date) {
 		if (items.isEmpty()) {
 			items.add("[");
@@ -89,10 +92,10 @@ public class CsvBuilderService {
 		jsonObject.put("tran_region", "domestic");
 		jsonObject.put("total_scheme_fee", "-0.17");
 		jsonObject.put("customer_id", "cs_1adeee80");
-		items.add(jsonObject.toString());
+		items.add(jsonObject.toString()+",");
 	}
 
-	private static void updateTruevoReconciliationData(List<String> items, String amount, String ref,
+	private void updateTruevoReconciliationData(List<String> items, String amount, String ref,
 			LocalDateTime date) {
 		String header = "Billing Method,Customer,Card Acceptor,Processing Date,Transaction Type,Transaction Status,Scheme,BIN ,Last 4,Issuing Country,Billing Region,Card Product,Card Type,Merchant ID,Terminal ID,MCC,RRN,ARN,Original RRN,Auth Code,Merchant Reference,Gateway Unique ID,ECI,Processing Currency,Processing Transaction Amount,Settlement Currency,Settlement Transaction Amount,Reserve Amount,Interchange Fee,Scheme Fee,Acquirer Fee,Settlement Net Amount,partner_name,";
 		if (items.isEmpty()) {
@@ -106,7 +109,7 @@ public class CsvBuilderService {
 		items.add(data);
 	}
 
-	public static void updateCredoraxReconciliationData(List<String> items, String amount, String ref,
+	public void updateCredoraxReconciliationData(List<String> items, String amount, String ref,
 			LocalDateTime date) {
 		String header = "merchant_name,contract_id,mid,descriptor,merchant_country,transaction_date,posting_date,transaction_type,orig_transaction_currency,orig_transaction_amount,transaction_region,card_scheme,card_type,card_brand,card_product,card_number,expiry_date,card_holder_country,request_id,searchable_code,submerchant_id,authorization_code,rrn,arn,payment_channel,settlement_currency,gross_transaction_amount,merchant_fixed_transaction_fee,merchant_interchange_amount,merchant_card_scheme_fees,merchant_acquiring_fee,merchant_discount_rate,net_settlement_amount,payment_id,B20,response_id,other_transactional_charges,Account_ID,";
 		if (items.isEmpty()) {
@@ -121,18 +124,16 @@ public class CsvBuilderService {
 		items.add(data);
 	}
 
-	public static void updateCredoraxFraudData(List<String> items, String amount, String ref, LocalDateTime date) {
+	public void updateCredoraxFraudData(List<String> items, String amount, String ref, LocalDateTime date) {
 		String header = "descriptor,country_code,trans_mcc,fraud_type,amount,issuer_bin,trans_date,card_number,arn,payment_channel,request_id,searchable_code,target_country_code,status_code,payment_id,Report_Date,Account_ID,";
 		if (items.isEmpty()) {
 			items.add(header);
 		}
-		String data = "XR ACADEMY*3197010208226,Netherlands,5817,6,34,476892,"+date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))+",476892******2233,'"+TestConstants.generateARN()+",ENET,"+TestConstants.getUniqueRef("REF-KEY-")+",,SVN,1,L2@APGHNW6,"+LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))+",CEID-0000818609,";
+		String data = "XR ACADEMY*3197010208226,Netherlands,5817,6,"+amount+",476892,"+date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))+",476892******2233,'"+TestConstants.generateARN()+",ENET,"+TestConstants.getUniqueRef("REF-KEY-")+",,SVN,1,L2@APGHNW6,"+LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))+",CEID-0000818609,";
 		items.add(data);
 	}
-/*
-*/
 
-	public static String getFilePath(String acquirer) {
+	public String getFilePath(String acquirer) {
 		String filePath = "";
 		switch (acquirer) {
 			case "acquired" :
@@ -145,7 +146,7 @@ public class CsvBuilderService {
 				filePath = "/home/ashish/TestFiles/ecommpayTest.json";
 				break;
 			case "credorax" :
-				filePath = "/home/ashish/TestFiles/credorax_fraud.csv";
+				filePath = "/home/ashish/TestFiles/credorax.csv";
 				break;
 
 			default :
@@ -154,24 +155,31 @@ public class CsvBuilderService {
 		return filePath;
 	}
 
-	public static String updateListToCsv(List<String> items) {
+	public String updateListToCsv(List<String> items, String acquirer) {
 		StringBuilder sb = new StringBuilder();
 		for (String item : items) {
 			sb.append(item);
 			sb.append("\n");
 		}
+		if (acquirer.equalsIgnoreCase("ecommpay")) {
+			sb.append("\n]");
+		}
 		return sb.toString();
 	}
 
-	public static void writeDataToFile(String path, String data) throws IOException {
+	public void writeDataToFile(String path, String data) {
 		File file = new File(path);
-		if (!file.exists()) {
-			Files.createFile(file.toPath());
+		try {
+			if (!file.exists()) {
+				Files.createFile(file.toPath());
+			}
+		} catch (Exception e) {
+			log.error("Error occurred while writing: {}", e.getMessage());
 		}
 		try (FileWriter writer = new FileWriter(file)) {
 			writer.write(data);
 		} catch (Exception e) {
-			System.out.println("Issue occurred while writing");
+			log.error("Issue occurred while writing: {}", e.getMessage());
 		}
 	}
 }
