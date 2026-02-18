@@ -1,25 +1,28 @@
 package com.payments.commons;
 
-import com.gateway.payment.AddressDTO;
-import com.gateway.payment.BillingDTO;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
+import com.gateway.payment.AddressDTO;
+import com.gateway.payment.BillingDTO;
+import org.w3c.dom.css.CSSImportRule;
+
 public class TestConstants {
 
-    public static final String SUCCESS = "http://192.168.1.49/success.html";
-    public static final String FAIL = "http://192.168.1.49/failed.html";
-    public static final String CANCEL = "http://192.168.1.49/cancel.html";
+    public static final String SUCCESS = "http://192.168.1.103/success.html";
+    public static final String FAIL = "http://192.168.1.103/failed.html";
+    public static final String CANCEL = "http://192.168.1.103/cancel.html";
 
     public static final String PAYMENT_ROUTING_ACCESS_TOKEN = "435df721059b45ca94985d6725eb63f1";
     public static final String TEST_WITH_ASHISH_ACCESS_TOKEN = "dc8c4655e89d44df936c7082f1fb4ab7";
-    public static final String LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN = "1b5cc0ffa58946adbbc0bcbbe49700d4";
+	// public static final String LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN = "1b5cc0ffa58946adbbc0bcbbe49700d4";
+	public static final String LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN = "fd93bf472fea4a55ae029c5c407bacc4";
     public static final String WOOD_MERCHANT_ACCESS_TOKEN = "da255112877f4f88ad50ef6ced31ac61";
     public static final String QA_WOOD_MERCHANT_ACCESS_TOKEN = "e00438ae97194d76b5b7829d1bdc9199";
-    public static final String QA_TEST_MERCHANT_ACCESS_TOKEN = "de592c848d3a4a6c89df49009b56fd66";
+	public static final String QA_TEST_MERCHANT_ACCESS_TOKEN = "fbf47c31ebab42a3bd079f49709091db";
     public static final String QA_PAYALLY_ACCESS_TOKEN = "d4de46adcbe0469695d82db346f4df80";
     public static final String LOCAL_MERCHANT_ACCESS_TOKEN = "58ff8059ab734dcb881d4bef81f46362";
     public static final String TEST_ALGO_ACCESS_TOKEN = "3ca23dadca634170be596990d4db423c";
@@ -40,12 +43,13 @@ public class TestConstants {
     public static final String TEST_ALGO_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/dev/ALG210425001-crt-CP-DEV.pem";
     public static final String WOOD_MERCHANT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/dev/GIT210317001-crt.pem";
     public static final String QA_WOOD_MERCHANT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/dev/GIT210317001-crt.pem";
-    public static final String QA_TEST_MERCHANT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/stag/TEM011220001-crt-CP-QA.pem";
+	public static final String QA_TEST_MERCHANT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/TEM011220001-crt-CP-QA.pem";
     public static final String QA_PAYALLY_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/stag/PTM141223001-crt-PY-QA.pem";
     public static final String QA_PRT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/stag/PRT171025001-crt-CP-QA.pem";
 
     public static final String MASTERCARD = "5500000000000004";
     public static final String VISA_CARD = "4200000000000000";
+	public static final String THREEDS_VISA_CARD = "4000000000001000";
     public static final String VISA_CARD_AMOUNT_BASED_FAILED = "4242000000000000";
     public static final String VISA_3D_SECURE_CARD = "4711100000000000";
     public static final String MASTER_3D_SECURE_CARD = "5299910010000015";
@@ -57,15 +61,20 @@ public class TestConstants {
 
     public static final String CARD_HOLDER_NAME = "Test User";
 
+	public static List<String> SUCCESS_CARD = List.of(MASTERCARD, VISA_CARD);
+
+	public static List<String> MID_TAGS = List.of("ecommpay", "acquired", "credorax", "truevo", "payxpert");
+	public static List<String> JSON_ACQUIRER = List.of("ecommpay", "acquired", "payxpert");
+
     public static String getUniqueRef(String type) {
         String timeStamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
         return type + timeStamp + new Random().nextInt(10);
     }
 
-    public static String generateARN() {
-        StringBuilder sb = new StringBuilder(23);
+    public static String generateARN(int size) {
+        StringBuilder sb = new StringBuilder(size);
         sb.append((int)(Math.random() * 9) + 1); // First digit 1-9
-        for (int i = 0; i < 22; i++) {
+        for (int i = 0; i < size; i++) {
             sb.append((int)(Math.random() * 10)); // Remaining digits 0-9
         }
         return sb.toString();

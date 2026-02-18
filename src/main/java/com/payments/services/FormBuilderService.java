@@ -1,9 +1,6 @@
 package com.payments.services;
 
-import lombok.extern.log4j.Log4j2;
-import org.springframework.stereotype.Service;
-
-import java.awt.Desktop;
+import java.awt.*;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -22,11 +19,15 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
+import org.springframework.stereotype.Service;
+
+import lombok.extern.log4j.Log4j2;
+
 @Log4j2
 @Service
 public class FormBuilderService {
 
-	public static final String PATH_OF_FILE = "C:\\Users\\Ashish Mishra\\Desktop\\paymentform.html";
+	public static final String PATH_OF_FILE = "/home/ashish/paymentform.html";
 
 	public void createForm(Map<String, Object> map) {
 		String endpoint = map.get("endpoint").toString();
@@ -71,15 +72,20 @@ public class FormBuilderService {
 	}
 
 	public void openInBrowser(File file) {
-        log.info("Opening File: {}", file.getAbsolutePath());
-		if (Desktop.isDesktopSupported()) {
-			try {
+		log.info("Opening File: {}", file.getAbsolutePath());
+		try {
+			String os = System.getProperty("os.name").toLowerCase();
+			if (os.contains("linux")) {
+				new ProcessBuilder("google-chrome", file.getAbsolutePath()).start();
+			} else if (os.contains("mac")) {
+				new ProcessBuilder("open", file.getAbsolutePath()).start();
+			} else if (os.contains("windows")) {
 				Desktop.getDesktop().browse(file.toURI());
-			} catch (IOException e) {
-				log.error("{}: {}",e, e.getMessage());
+			} else {
+				log.warn("Unsupported OS for browser opening");
 			}
-		} else {
-			log.error("Desktop is not supported");
+		} catch (IOException e) {
+			log.error("{}: {}", e, e.getMessage());
 		}
 	}
 

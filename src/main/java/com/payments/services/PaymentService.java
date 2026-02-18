@@ -11,7 +11,6 @@ import org.springframework.util.StringUtils;
 
 import com.gateway.authorization.AuthorizationFactory;
 import com.gateway.authorization.CaptureDTO;
-import com.gateway.constants.enums.CardTypeEnum;
 import com.gateway.encryption.Certificate;
 import com.gateway.exception.ApplicationError;
 import com.gateway.payment.AddressDTO;
@@ -35,21 +34,19 @@ public class PaymentService {
 	private final FormBuilderService formBuilder;
 	private final CsvBuilderService csvBuilderService;
 
-	String customerID = TestConstants.getUniqueRef("CUS-TEST");
-
 	public void payment(int count, String acquirer, boolean capture, boolean reconciliation, boolean subscription,
 			boolean staging) {
 		List<String> items = new ArrayList<>();
 		if (count == 0) {
 			count = 1;
 		}
-		if (!StringUtils.hasLength(acquirer)) {
-			acquirer = "truevo";
-		}
 		try {
 			for (int i = 0; i < count; i++) {
+				if (!StringUtils.hasLength(acquirer)) {
+					acquirer = TestConstants.MID_TAGS.get(new Random().nextInt(TestConstants.MID_TAGS.size()));
+				}
 				processPayment(items, acquirer, capture, reconciliation, subscription, staging);
-				log.info("{}.) Transaction Successful.", i+1);
+				log.info("{}.) Transaction Successful.", i + 1);
 			}
 			if (reconciliation) {
 				csvBuilderService.writeDataToFile(csvBuilderService.getFilePath(acquirer),
@@ -67,30 +64,39 @@ public class PaymentService {
 		Random random = new Random();
 		double amount = 10 + random.nextInt(50);
 		String txnReference = TestConstants.getUniqueRef("TEST");
-		TransactionDTO transactionDetails = new TransactionDTO(txnReference, BigDecimal.valueOf(amount), "EUR", false);
-		transactionDetails.setMidTag("twa-" + acquirer);
+		TransactionDTO transactionDetails = new TransactionDTO(txnReference, BigDecimal.valueOf(amount), "EUR", true);
+		transactionDetails.setMidTag(acquirer);
+		if (subscription) {
+			transactionDetails.setSubscriptionId("3e581779-5451-44df-a3ef-3f7226a5e996");
+		}
 		log.info("Payment Request: {}", transactionDetails);
 		String accessToken = staging
 				? TestConstants.LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN
-				: TestConstants.TEST_WITH_ASHISH_ACCESS_TOKEN;
+				: TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN;
 		Map<String, Object> payment = PaymentFactory.getInstance(getCertificate(), getMerchantDetails(), accessToken)
 				.setStaging(staging).setTransactionDetails(transactionDetails)
 				.setBillingDetails(getAddressDetails(faker)).setCardDetails(getCardDetails(faker))
 				.setCustomerDetails(getCustomerDetails(faker)).setUrlDetails(getUrlDetails()).buildPayment();
 		formBuilder.createForm(payment);
 		if (!capture) {
+			sleep();
 			return;
 		}
-		try {
-			Thread.sleep(0);
-		} catch (InterruptedException e) {
-			log.error("Error occurred while sleeping");
-			return;
-		}
+		if (sleep()) return;
 		captureTxn(txnReference, "EUR", String.valueOf(amount), staging);
 		if (reconciliation) {
 			csvBuilderService.prepareReconciliationFile(items, acquirer, String.valueOf(amount), txnReference);
 		}
+	}
+
+	private static boolean sleep() {
+		try {
+			Thread.sleep(800);
+		} catch (InterruptedException e) {
+			log.error("Error occurred while sleeping");
+			return true;
+		}
+		return false;
 	}
 
 	public void captureTxn(String txnRef, String currency, String amount, boolean staging) throws ApplicationError {
@@ -98,7 +104,7 @@ public class PaymentService {
 		captureDTO.setAmount(amount);
 		String accessToken = staging
 				? TestConstants.LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN
-				: TestConstants.TEST_WITH_ASHISH_ACCESS_TOKEN;
+				: TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN;
 		AuthorizationFactory.getInstance(getCertificate(), getMerchantDetails().getMerchantID(), accessToken)
 				.setStaging(staging).setCaptureDetails(captureDTO).buildCapture();
 		log.info("Transaction Captured Successfully");
@@ -107,22 +113,33 @@ public class PaymentService {
 	private CustomerDTO getCustomerDetails(Faker faker) {
 		CustomerDTO customerDTO = new CustomerDTO();
 		customerDTO.setIpAddress(faker.internet().ipV4Address());
+		// customerDTO.setBillingAddress(new BillingDTO(getAddressDetails(faker)));
+		// customerDTO.setShippingAddress(new ShippingDTO(getAddressDetails(faker)));
+		// customerDTO.setDob(faker.date().birthday().toString());
 		return customerDTO;
 	}
 
 	private AddressDTO getAddressDetails(Faker faker) {
 		AddressDTO addressDetails = new AddressDTO(faker.internet().emailAddress());
 		addressDetails.setCountry(faker.address().countryCode());
+		// addressDetails.setCity(faker.address().city());
+		// addressDetails.setZip(faker.address().zipCode());
+		// addressDetails.setAddressLine1(faker.address().streetAddress());
+		// addressDetails.setAddressLine2(faker.address().secondaryAddress());
+		// addressDetails.setMobileNo(faker.phoneNumber().cellPhone());
+		// addressDetails.setFirstName(faker.name().firstName());
+		// addressDetails.setLastName(faker.name().lastName());
+		// addressDetails.setState(faker.address().state());
 		return addressDetails;
 	}
 
 	private CardDetailsDTO getCardDetails(Faker faker) {
+		Random random = new Random();
 		CardDetailsDTO cardDetails = new CardDetailsDTO();
-		cardDetails.setCardNumber(TestConstants.VISA_CARD);
-		cardDetails.setCardType("");
+		cardDetails.setCardNumber(TestConstants.SUCCESS_CARD.get(random.nextInt(TestConstants.SUCCESS_CARD.size())));
+		// cardDetails.setCardNumber(TestConstants.THREEDS_VISA_CARD);
 		cardDetails.setExpMonth("04");
 		cardDetails.setExpYear("2028");
-		cardDetails.setCardType(CardTypeEnum.VISA_CARD.getValue());
 		cardDetails.setCvv("123");
 		cardDetails.setNameOnCard(faker.name().fullName());
 		return cardDetails;
@@ -133,7 +150,7 @@ public class PaymentService {
 	}
 
 	private MerchantDTO getMerchantDetails() {
-		return new MerchantDTO(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID, "CUSTEST202511051951139");
+		return new MerchantDTO(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID, TestConstants.getUniqueRef("CUS-TEST"));
 	}
 
 	private Certificate getCertificate() {
