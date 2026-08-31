@@ -2,10 +2,17 @@ package com.payments.services;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import com.gateway.constants.enums.PaymentModeEnum;
+import com.payments.commons.Utils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -13,18 +20,17 @@ import com.gateway.authorization.AuthorizationFactory;
 import com.gateway.authorization.CaptureDTO;
 import com.gateway.encryption.Certificate;
 import com.gateway.exception.ApplicationError;
-import com.gateway.payment.AddressDTO;
 import com.gateway.payment.CardDetailsDTO;
-import com.gateway.payment.CustomerDTO;
 import com.gateway.payment.MerchantDTO;
 import com.gateway.payment.PaymentFactory;
 import com.gateway.payment.TransactionDTO;
-import com.gateway.payment.UrlDTO;
+import com.payments.beans.PaymentRequest;
 import com.payments.commons.TestConstants;
+//import com.payments.commons.Utils;
+import com.payments.enums.Environment;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import net.datafaker.Faker;
 
 @Log4j2
 @Service
@@ -33,128 +39,160 @@ public class PaymentService {
 
 	private final FormBuilderService formBuilder;
 	private final CsvBuilderService csvBuilderService;
+	private final Random random = new Random();
 
-	public void payment(int count, String acquirer, boolean capture, boolean reconciliation, boolean subscription,
-			boolean staging) {
-		List<String> items = new ArrayList<>();
-		if (count == 0) {
-			count = 1;
+	public void payment(PaymentRequest paymentRequest) {
+		if (paymentRequest == null) {
+			return;
 		}
+
+		int count = paymentRequest.getCount() == 0 ? 1 : paymentRequest.getCount();
+		List<String> items = Collections.synchronizedList(new ArrayList<>());
+		ExecutorService executorService = Executors.newFixedThreadPool(20);
 		try {
+			List<Future<?>> futures = new ArrayList<>();
 			for (int i = 0; i < count; i++) {
-				if (!StringUtils.hasLength(acquirer)) {
-					acquirer = TestConstants.MID_TAGS.get(new Random().nextInt(TestConstants.MID_TAGS.size()));
-				}
-				processPayment(items, acquirer, capture, reconciliation, subscription, staging);
-				log.info("{}.) Transaction Successful.", i + 1);
+				futures.add(executorService.submit(() -> {
+					try {
+						PaymentRequest requestCopy = new PaymentRequest();
+						BeanUtils.copyProperties(paymentRequest, requestCopy);
+						String acquirer = requestCopy.getAcquirer();
+						if (!StringUtils.hasLength(acquirer)) {
+							acquirer = TestConstants.MID_TAGS.get(random.nextInt(TestConstants.MID_TAGS.size()));
+							requestCopy.setAcquirer(acquirer);
+						}
+						log.info("Processing Transaction using {} Thread", Thread.currentThread().getName());
+						log.info("Acquirer Obtained for transaction: {}", acquirer);
+						processPayment(items, requestCopy);
+					} catch (ApplicationError e) {
+						log.error("Error occurred: {}", e.getMessage(), e);
+					}
+				}));
+				log.info("{}.) Transaction Submitted.", i + 1);
 			}
-			if (reconciliation) {
-				csvBuilderService.writeDataToFile(csvBuilderService.getFilePath(acquirer),
+			for (Future<?> future : futures) {
+				future.get();
+			}
+			String acquirer = paymentRequest.getAcquirer();
+			if (paymentRequest.isReconciliation()) {
+				csvBuilderService.writeDataToFile(
+						csvBuilderService.getFilePath(acquirer, paymentRequest.getReconciliationType()),
 						csvBuilderService.updateListToCsv(items, acquirer));
 			}
 			log.info("Processing Completed Successfully");
-		} catch (ApplicationError e) {
-			log.error("Error occurred");
+		} catch (Exception e) {
+			log.error("Unexpected error: {}", e.getMessage(), e);
+		} finally {
+			executorService.shutdown();
 		}
 	}
 
-	public void processPayment(List<String> items, String acquirer, boolean capture, boolean reconciliation,
-			boolean subscription, boolean staging) throws ApplicationError {
-		Faker faker = new Faker();
+	public void processPayment(List<String> items, PaymentRequest paymentRequest) throws ApplicationError {
+		updateCredentials(paymentRequest);
 		Random random = new Random();
 		double amount = 10 + random.nextInt(50);
-		String txnReference = TestConstants.getUniqueRef("TEST");
-		TransactionDTO transactionDetails = new TransactionDTO(txnReference, BigDecimal.valueOf(amount), "EUR", true);
-		transactionDetails.setMidTag(acquirer);
-		if (subscription) {
-			transactionDetails.setSubscriptionId("3e581779-5451-44df-a3ef-3f7226a5e996");
+		String txnReference = TestConstants.getUniqueRef("TEST") + TestConstants.generateAuthCode();
+		TransactionDTO transactionDetails = new TransactionDTO(txnReference, BigDecimal.valueOf(amount), "EUR", false);
+		transactionDetails.setMidTag(paymentRequest.getAcquirer());
+//		transactionDetails.setPaymentMode(PaymentModeEnum.CREDIT_CARD);
+		if (paymentRequest.isSubscription()) {
+			transactionDetails.setSubscriptionId(paymentRequest.getSubscriptionRequest().getSubscriptionId());
 		}
 		log.info("Payment Request: {}", transactionDetails);
-		String accessToken = staging
-				? TestConstants.LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN
-				: TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN;
-		Map<String, Object> payment = PaymentFactory.getInstance(getCertificate(), getMerchantDetails(), accessToken)
-				.setStaging(staging).setTransactionDetails(transactionDetails)
-				.setBillingDetails(getAddressDetails(faker)).setCardDetails(getCardDetails(faker))
-				.setCustomerDetails(getCustomerDetails(faker)).setUrlDetails(getUrlDetails()).buildPayment();
+		log.info("Merchant id: {}, accessToken: {}", paymentRequest.getMerchantId(), paymentRequest.getAccessToken());
+		CardDetailsDTO cardDetails = Utils.getCardDetails(paymentRequest);
+		String cardType = cardDetails.getCardType();
+		Map<String, Object> payment = PaymentFactory
+				.getInstance(getCertificate(paymentRequest), getMerchantDetails(paymentRequest),
+						paymentRequest.getAccessToken())
+				.setPaymentMode(PaymentModeEnum.CREDIT_CARD)
+				.setDebugLogs(true).setStaging(paymentRequest.isStaging()).setTransactionDetails(transactionDetails)
+				.setBillingDetails(Utils.getAddressDetails()).setCardDetails(cardDetails)
+				.setCustomerDetails(Utils.getCustomerDetails()).setUrlDetails(Utils.getUrlDetails()).buildPayment();
 		formBuilder.createForm(payment);
-		if (!capture) {
+		if (paymentRequest.isCaptureTxn()) {
 			sleep();
-			return;
+			captureTxn(txnReference, "EUR", String.valueOf(amount), paymentRequest);
 		}
-		if (sleep()) return;
-		captureTxn(txnReference, "EUR", String.valueOf(amount), staging);
-		if (reconciliation) {
-			csvBuilderService.prepareReconciliationFile(items, acquirer, String.valueOf(amount), txnReference);
+		if (paymentRequest.isReconciliation()) {
+			csvBuilderService.prepareReconciliationFile(items, paymentRequest, String.valueOf(amount), txnReference,
+					cardType);
 		}
 	}
 
-	private static boolean sleep() {
+	private static void sleep() {
 		try {
-			Thread.sleep(800);
+			Thread.sleep(200);
 		} catch (InterruptedException e) {
 			log.error("Error occurred while sleeping");
-			return true;
 		}
-		return false;
 	}
 
-	public void captureTxn(String txnRef, String currency, String amount, boolean staging) throws ApplicationError {
+	public void captureTxn(String txnRef, String currency, String amount, PaymentRequest paymentRequest)
+			throws ApplicationError {
 		CaptureDTO captureDTO = new CaptureDTO(txnRef, currency);
 		captureDTO.setAmount(amount);
-		String accessToken = staging
-				? TestConstants.LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN
-				: TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN;
-		AuthorizationFactory.getInstance(getCertificate(), getMerchantDetails().getMerchantID(), accessToken)
-				.setStaging(staging).setCaptureDetails(captureDTO).buildCapture();
+		AuthorizationFactory
+				.getInstance(getCertificate(paymentRequest), getMerchantDetails(paymentRequest).getMerchantID(),
+						paymentRequest.getAccessToken())
+				.setStaging(paymentRequest.isStaging()).setCaptureDetails(captureDTO).buildCapture();
 		log.info("Transaction Captured Successfully");
 	}
 
-	private CustomerDTO getCustomerDetails(Faker faker) {
-		CustomerDTO customerDTO = new CustomerDTO();
-		customerDTO.setIpAddress(faker.internet().ipV4Address());
-		// customerDTO.setBillingAddress(new BillingDTO(getAddressDetails(faker)));
-		// customerDTO.setShippingAddress(new ShippingDTO(getAddressDetails(faker)));
-		// customerDTO.setDob(faker.date().birthday().toString());
-		return customerDTO;
+	private MerchantDTO getMerchantDetails(PaymentRequest paymentRequest) {
+		return new MerchantDTO(paymentRequest.getMerchantId(), TestConstants.getUniqueRef("CUS-TEST"));
 	}
 
-	private AddressDTO getAddressDetails(Faker faker) {
-		AddressDTO addressDetails = new AddressDTO(faker.internet().emailAddress());
-		addressDetails.setCountry(faker.address().countryCode());
-		// addressDetails.setCity(faker.address().city());
-		// addressDetails.setZip(faker.address().zipCode());
-		// addressDetails.setAddressLine1(faker.address().streetAddress());
-		// addressDetails.setAddressLine2(faker.address().secondaryAddress());
-		// addressDetails.setMobileNo(faker.phoneNumber().cellPhone());
-		// addressDetails.setFirstName(faker.name().firstName());
-		// addressDetails.setLastName(faker.name().lastName());
-		// addressDetails.setState(faker.address().state());
-		return addressDetails;
+	private Certificate getCertificate(PaymentRequest paymentRequest) {
+		return new Certificate(paymentRequest.getCertPath(), null);
 	}
 
-	private CardDetailsDTO getCardDetails(Faker faker) {
-		Random random = new Random();
-		CardDetailsDTO cardDetails = new CardDetailsDTO();
-		cardDetails.setCardNumber(TestConstants.SUCCESS_CARD.get(random.nextInt(TestConstants.SUCCESS_CARD.size())));
-		// cardDetails.setCardNumber(TestConstants.THREEDS_VISA_CARD);
-		cardDetails.setExpMonth("04");
-		cardDetails.setExpYear("2028");
-		cardDetails.setCvv("123");
-		cardDetails.setNameOnCard(faker.name().fullName());
-		return cardDetails;
+	private void updateCredentials(PaymentRequest paymentRequest) {
+		updateEnvironment(paymentRequest);
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID)
+				&& paymentRequest.isStaging()) {
+			paymentRequest.setAccessToken(TestConstants.LOCAL_TEST_WITH_ASHISH_ACCESS_TOKEN);
+//			 paymentRequest.setAccessToken("872bdee113524d8f8450df57cf326942");
+			paymentRequest.setCertPath(TestConstants.TEST_WITH_ASHISH_CERT_PATH);
+			return;
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.WOOD_MERCHANT_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.WOOD_MERCHANT_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.WOOD_MERCHANT_CERT_PATH);
+			return;
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.TEST_WITH_ASHISH_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.TEST_WITH_ASHISH_CERT_PATH);
+			return;
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.QA_TEST_MERCHANT_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.QA_TEST_MERCHANT_CERT_PATH);
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_ALGO_GRANDCHILD_1_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.TEST_ALGO_GRANDCHILD_1_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.TEST_ALGO_GRANDCHILD_1_CERT_PATH);
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_ALGO_GRANDCHILD_3_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.TEST_ALGO_GRANDCHILD_3_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.TEST_ALGO_GRANDCHILD_3_CERT_PATH);
+		}
 	}
 
-	private UrlDTO getUrlDetails() {
-		return new UrlDTO(TestConstants.SUCCESS, TestConstants.FAIL, TestConstants.CANCEL);
-	}
-
-	private MerchantDTO getMerchantDetails() {
-		return new MerchantDTO(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID, TestConstants.getUniqueRef("CUS-TEST"));
-	}
-
-	private Certificate getCertificate() {
-		return new Certificate(TestConstants.TEST_WITH_ASHISH_CERT_PATH, null);
+	private void updateEnvironment(PaymentRequest paymentRequest) {
+		if (paymentRequest.getEnvironment().equalsIgnoreCase(Environment.LOCAL.getValue())) {
+			paymentRequest.setStaging(true);
+		}
+		if (paymentRequest.getEnvironment().equalsIgnoreCase(Environment.DEV.getValue())) {
+			paymentRequest.setStaging(false);
+		}
+		if (paymentRequest.getEnvironment().equalsIgnoreCase(Environment.STAG.getValue())) {
+			paymentRequest.setStaging(false);
+		}
+		if (paymentRequest.getEnvironment().equalsIgnoreCase(Environment.SUSHIL_SIR.getValue())) {
+			paymentRequest.setStaging(false);
+		}
 	}
 
 }
