@@ -94,7 +94,6 @@ public class PaymentService {
 		String txnReference = TestConstants.getUniqueRef("TEST") + TestConstants.generateAuthCode();
 		TransactionDTO transactionDetails = new TransactionDTO(txnReference, BigDecimal.valueOf(amount), "EUR", false);
 		transactionDetails.setMidTag(paymentRequest.getAcquirer());
-//		transactionDetails.setPaymentMode(PaymentModeEnum.CREDIT_CARD);
 		if (paymentRequest.isSubscription()) {
 			transactionDetails.setSubscriptionId(paymentRequest.getSubscriptionRequest().getSubscriptionId());
 		}
@@ -122,7 +121,7 @@ public class PaymentService {
 
 	private static void sleep() {
 		try {
-			Thread.sleep(200);
+			Thread.sleep(300);
 		} catch (InterruptedException e) {
 			log.error("Error occurred while sleeping");
 		}
@@ -169,14 +168,22 @@ public class PaymentService {
 		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.QA_TEST_MERCHANT_MERCHANT_ID)) {
 			paymentRequest.setAccessToken(TestConstants.QA_TEST_MERCHANT_ACCESS_TOKEN);
 			paymentRequest.setCertPath(TestConstants.QA_TEST_MERCHANT_CERT_PATH);
+			return;
 		}
 		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_ALGO_GRANDCHILD_1_MERCHANT_ID)) {
 			paymentRequest.setAccessToken(TestConstants.TEST_ALGO_GRANDCHILD_1_ACCESS_TOKEN);
 			paymentRequest.setCertPath(TestConstants.TEST_ALGO_GRANDCHILD_1_CERT_PATH);
+			return;
 		}
 		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.TEST_ALGO_GRANDCHILD_3_MERCHANT_ID)) {
 			paymentRequest.setAccessToken(TestConstants.TEST_ALGO_GRANDCHILD_3_ACCESS_TOKEN);
 			paymentRequest.setCertPath(TestConstants.TEST_ALGO_GRANDCHILD_3_CERT_PATH);
+			return;
+		}
+		if (paymentRequest.getMerchantId().equalsIgnoreCase(TestConstants.BLUE_ORBIT_MERCHANT_ID)) {
+			paymentRequest.setAccessToken(TestConstants.BLUE_ORBIT_ACCESS_TOKEN);
+			paymentRequest.setCertPath(TestConstants.BLUE_ORBIT_CERT_PATH);
+			return;
 		}
 	}
 

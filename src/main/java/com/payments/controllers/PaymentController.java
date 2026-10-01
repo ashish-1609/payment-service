@@ -63,11 +63,11 @@ public class PaymentController {
 	@GetMapping("/form-data")
 	public String formData() {
 		List<String> acquirers = List.of("acquired", "truevo", "credorax", "payxpert", "ecommpay", "payreto",
-				"braintree", "nmi");
+				"braintree", "nmi", "stripe");
 		List<String> merchants = List.of(TestConstants.TEST_WITH_ASHISH_MERCHANT_ID,
 				TestConstants.WOOD_MERCHANT_MERCHANT_ID, TestConstants.TEST_ALGO_MERCHANT_ID,
 				TestConstants.TEST_ALGO_GRANDCHILD_1_MERCHANT_ID, TestConstants.TEST_ALGO_GRANDCHILD_3_MERCHANT_ID,
-				TestConstants.QA_TEST_MERCHANT_MERCHANT_ID);
+				TestConstants.QA_TEST_MERCHANT_MERCHANT_ID, TestConstants.BLUE_ORBIT_MERCHANT_ID);
 		List<String> environments = List.of("prod", "stag", "dev", "local", "sushil_sir");
 		String cardHolderName = new Faker().name().fullName();
 		JSONObject jsonObject = new JSONObject();

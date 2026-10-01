@@ -28,6 +28,7 @@ public class TestConstants {
 	public static final String QA_PRT_ACCESS_TOKEN = "07bd11e2892247c29b611ca731e22045";
 	public static final String TEST_ALGO_GRANDCHILD_1_ACCESS_TOKEN = "4c5187534c28450aa5311a1a12bd0be6";
 	public static final String TEST_ALGO_GRANDCHILD_3_ACCESS_TOKEN = "b50668e128c342f68f015f2213455b4d";
+	public static final String BLUE_ORBIT_ACCESS_TOKEN = "48bc97c23ef14107b1e8cf599f1a5065";
 
 	public static final String PAYMENT_ROUTING_MERCHANT_ID = "PAY230124001";
 	public static final String TEST_WITH_ASHISH_MERCHANT_ID = "TES250325001";
@@ -41,6 +42,7 @@ public class TestConstants {
 	public static final String QA_PRT_MERCHANT_ID = "PRT171025001";
 	public static final String TEST_ALGO_GRANDCHILD_1_MERCHANT_ID = "TAG1040625001";
 	public static final String TEST_ALGO_GRANDCHILD_3_MERCHANT_ID = "TAG3040625001";
+	public static final String BLUE_ORBIT_MERCHANT_ID = "BLU230926002";
 
 	public static final String PAYMENT_ROUTING_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/dev/PAY230124001-crt.pem";
 	public static final String TEST_WITH_ASHISH_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/local/TES250325001-crt-CP-DEV.pem";
@@ -53,6 +55,7 @@ public class TestConstants {
 	public static final String QA_TEST_MERCHANT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/TEM011220001-crt-CP-QA.pem";
 	public static final String QA_PAYALLY_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/stag/PTM141223001-crt-PY-QA.pem";
 	public static final String QA_PRT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/stag/PRT171025001-crt-CP-QA.pem";
+	public static final String BLUE_ORBIT_CERT_PATH = "/home/ashish/Certificates/merchant_certificates/BLU230926002-crt.pem";
 
 	public static final String MASTERCARD = "5500000000000004";
 	public static final String VISA_CARD = "4200000000000000";
@@ -72,7 +75,8 @@ public class TestConstants {
 
 	public static List<String> MID_TAGS = List.of("ecommpay", "acquired", "credorax", "truevo", "payxpert", "payreto",
 			"nmi");
-	public static List<String> JSON_ACQUIRER = List.of("ecommpay", "acquired", "payxpert", "braintree", "nmi");
+	public static List<String> JSON_ACQUIRER = List.of("ecommpay", "acquired", "payxpert", "braintree", "nmi",
+			"stripe");
 
 	public static String getUniqueRef(String type) {
 		String timeStamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());

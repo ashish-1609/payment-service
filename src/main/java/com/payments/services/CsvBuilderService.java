@@ -6,12 +6,12 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Random;
 
-import com.payments.commons.Utils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import com.gateway.constants.enums.CardTypeEnum;
 import com.payments.beans.PaymentRequest;
 import com.payments.commons.TestConstants;
-//import com.payments.commons.Utils;
+import com.payments.commons.Utils;
 import com.payments.enums.ChargebackReason;
 
 import lombok.extern.log4j.Log4j2;
@@ -77,10 +77,117 @@ public class CsvBuilderService {
 			updateForBraintreeReconciliation(items, amount, ref, date, paymentRequest.isCaptureTxn());
 		} else if (acquirer.equalsIgnoreCase("nmi") && reconciliationType.equalsIgnoreCase("capture")) {
 			updateForNmiReconciliation(paymentRequest.isCaptureTxn(), ref, date, amount, items);
+		} else if (acquirer.equalsIgnoreCase("stripe") && reconciliationType.equalsIgnoreCase("chargeback")) {
+			updateForStripeChargeback(items, amount, ref, date, chargebackReason);
 		}
 	}
 
-    private void updateForEcommpayFraudData(List<String> items, String amount, String ref, LocalDateTime date) {
+	private void updateForStripeChargeback(List<String> items, String amount, String ref, LocalDateTime date,
+			String chargebackReason) {
+		long epochSecond = date.plusMinutes(2).atZone(ZoneId.systemDefault()).toEpochSecond();
+		if (items.isEmpty()) {
+			items.add("[");
+		}
+		String chb = TestConstants.getUniqueRef("CHB");
+		JSONObject dispute = new JSONObject();
+		dispute.put("balance_transaction", "txn_1UHrGSDwr7i4Cg9Vp2UljJMc");
+		dispute.put("reason", "fraudulent");
+		dispute.put("amount", Math.round(Double.parseDouble(amount) * 100));
+		dispute.put("metadata", new JSONObject());
+		dispute.put("charge", chb);
+
+		JSONObject evidence = new JSONObject();
+		evidence.put("refund_policy", JSONObject.NULL);
+		evidence.put("enhanced_evidence", new JSONObject());
+		evidence.put("customer_communication", JSONObject.NULL);
+		evidence.put("shipping_date", JSONObject.NULL);
+		evidence.put("billing_address", "CA");
+		evidence.put("duplicate_charge_documentation", JSONObject.NULL);
+		evidence.put("refund_policy_disclosure", JSONObject.NULL);
+		evidence.put("shipping_carrier", JSONObject.NULL);
+		evidence.put("service_documentation", JSONObject.NULL);
+		evidence.put("uncategorized_text", JSONObject.NULL);
+		evidence.put("cancellation_policy_disclosure", JSONObject.NULL);
+		evidence.put("service_date", JSONObject.NULL);
+		evidence.put("duplicate_charge_id", JSONObject.NULL);
+		evidence.put("shipping_address", JSONObject.NULL);
+		evidence.put("product_description", JSONObject.NULL);
+		evidence.put("duplicate_charge_explanation", JSONObject.NULL);
+		evidence.put("customer_purchase_ip", JSONObject.NULL);
+		evidence.put("refund_refusal_explanation", JSONObject.NULL);
+		evidence.put("uncategorized_file", JSONObject.NULL);
+		evidence.put("shipping_documentation", JSONObject.NULL);
+		evidence.put("access_activity_log", JSONObject.NULL);
+		evidence.put("cancellation_rebuttal", JSONObject.NULL);
+		evidence.put("customer_signature", JSONObject.NULL);
+		evidence.put("cancellation_policy", JSONObject.NULL);
+		evidence.put("receipt", JSONObject.NULL);
+		evidence.put("customer_name", "Mohammad Sultani");
+		evidence.put("customer_email_address", "sultanimohammad91@gmail.com");
+		evidence.put("shipping_tracking_number", JSONObject.NULL);
+
+		dispute.put("evidence", evidence);
+		dispute.put("livemode", true);
+
+		JSONObject evidenceDetails = new JSONObject();
+		evidenceDetails.put("enhanced_eligibility", new JSONObject());
+		evidenceDetails.put("has_evidence", false);
+		evidenceDetails.put("due_by", 1791331199);
+		evidenceDetails.put("submission_count", 0);
+		evidenceDetails.put("past_due", false);
+
+		dispute.put("evidence_details", evidenceDetails);
+		dispute.put("created", epochSecond);
+
+		JSONObject paymentMethodDetails = new JSONObject();
+		paymentMethodDetails.put("type", "card");
+
+		JSONObject card = new JSONObject();
+		card.put("case_type", "chargeback");
+		card.put("brand", "visa");
+		card.put("network_reason_code", chargebackReason);
+		card.put("network", "visa");
+		paymentMethodDetails.put("card", card);
+		dispute.put("payment_method_details", paymentMethodDetails);
+		JSONArray balanceTransactions = new JSONArray();
+		JSONObject balanceTransaction = new JSONObject();
+		balanceTransaction.put("amount", -2146);
+		balanceTransaction.put("available_on", epochSecond);
+		balanceTransaction.put("exchange_rate", JSONObject.NULL);
+		balanceTransaction.put("created", epochSecond);
+		balanceTransaction.put("fee", 1500);
+		balanceTransaction.put("reporting_category", "dispute");
+		JSONArray feeDetails = new JSONArray();
+		JSONObject feeDetail = new JSONObject();
+		feeDetail.put("amount", 1500);
+		feeDetail.put("application", JSONObject.NULL);
+		feeDetail.put("description", "Dispute fee");
+		feeDetail.put("currency", "usd");
+		feeDetail.put("type", "stripe_fee");
+		feeDetails.put(feeDetail);
+		balanceTransaction.put("fee_details", feeDetails);
+		balanceTransaction.put("description", "Chargeback withdrawal for " + chb);
+		balanceTransaction.put("source", "du_1UHrFaDwr7i4Cg9VEAvncGbu");
+		balanceTransaction.put("type", "adjustment");
+		balanceTransaction.put("balance_type", "payments");
+		balanceTransaction.put("currency", "usd");
+		balanceTransaction.put("id", "txn_1UHrGSDwr7i4Cg9Vp2UljJMc");
+		balanceTransaction.put("net", -3646);
+		balanceTransaction.put("object", "balance_transaction");
+		balanceTransaction.put("status", "available");
+		balanceTransactions.put(balanceTransaction);
+		dispute.put("balance_transactions", balanceTransactions);
+		dispute.put("is_charge_refundable", false);
+		dispute.put("enhanced_eligibility_types", new JSONArray());
+		dispute.put("currency", "eur");
+		dispute.put("payment_intent", ref);
+		dispute.put("id", chb);
+		dispute.put("object", "dispute");
+		dispute.put("status", "needs_response");
+		items.add(dispute.toString() + ",");
+	}
+
+	private void updateForEcommpayFraudData(List<String> items, String amount, String ref, LocalDateTime date) {
 		if (items.isEmpty()) {
 			items.add("[");
 		}
@@ -187,7 +294,7 @@ public class CsvBuilderService {
 				.put("amount", String.valueOf(Double.parseDouble(amount) * 100)).put("customerIP", "80.187.113.70")
 				.put("orderID", ref).put("referralID", JSONObject.NULL).put("errorCode", chargebackReason)
 				.put("shopperEmail", "lidiagalkina@hotmail.com").put("orderDescription", JSONObject.NULL)
-				.put("transactionID", TestConstants.generateARN(9)).put("paymentType", "creditcard")
+				.put("transactionID", ref).put("paymentType", "creditcard")
 				.put("shopperName", "Lidia Galkina").put("paymentMeanInfo", paymentMeanInfo).put("currency", "EUR")
 				.put("subscriptionID", 0).put("operation", "chargeback").put("status", "authorized");
 		items.add(jsonObject.toString() + ",");
@@ -207,7 +314,7 @@ public class CsvBuilderService {
 				.put("amount", String.valueOf(Double.parseDouble(amount) * 100)).put("customerIP", "80.187.113.70")
 				.put("orderID", ref).put("referralID", JSONObject.NULL).put("errorCode", chargebackReason)
 				.put("shopperEmail", "lidiagalkina@hotmail.com").put("orderDescription", JSONObject.NULL)
-				.put("transactionID", TestConstants.generateARN(9)).put("paymentType", "creditcard")
+				.put("transactionID", ref).put("paymentType", "creditcard")
 				.put("shopperName", "Lidia Galkina").put("paymentMeanInfo", paymentMeanInfo).put("currency", "EUR")
 				.put("subscriptionID", 0).put("operation", "fraud").put("status", "authorized");
 		items.add(jsonObject.toString() + ",");
@@ -508,6 +615,8 @@ public class CsvBuilderService {
 			filePath = "/home/ashish/TestFiles/braintree.json";
 		} else if (acquirer.equalsIgnoreCase("nmi") && reconciliationType.equalsIgnoreCase("capture")) {
 			filePath = "/home/ashish/TestFiles/nmi_capture.json";
+		} else if (acquirer.equalsIgnoreCase("stripe") && reconciliationType.equalsIgnoreCase("chargeback")) {
+			filePath = "/home/ashish/TestFiles/stripe_chargeback.json";
 		}
 		return filePath;
 	}
@@ -519,7 +628,7 @@ public class CsvBuilderService {
 			sb.append("\n");
 		}
 		if (TestConstants.JSON_ACQUIRER.contains(acquirer)) {
-			sb.setLength(sb.length() - 3);
+			sb.setLength(sb.length() - 2);
 			sb.append("\n]");
 		}
 		return sb.toString();
